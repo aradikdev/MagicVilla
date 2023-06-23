@@ -1,4 +1,5 @@
-﻿using MagicVillaAPI.Data;
+﻿using AutoMapper;
+using MagicVillaAPI.Data;
 using MagicVillaAPI.Models;
 using MagicVillaAPI.Models.Dto;
 using Microsoft.AspNetCore.JsonPatch;
@@ -14,18 +15,21 @@ public class VillaAPIController : ControllerBase
 {
     private readonly ILogger<VillaAPIController> _logger;
     private readonly AppDbContext _db;
+    private readonly IMapper _mapper;
 
-    public VillaAPIController(ILogger<VillaAPIController> logger, AppDbContext db)
+    public VillaAPIController(ILogger<VillaAPIController> logger, AppDbContext db, IMapper mapper)
     {
         _logger = logger;
         _db = db;
+        _mapper = mapper;
     }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<VillaDTO>>> GetVillas()
     {
         _logger.LogInformation("Get All Villas");
-        return Ok(await _db.Villas.ToListAsync());
+        IEnumerable<Villa> villas = await _db.Villas.ToListAsync();
+        return Ok(_mapper.Map<VillaDTO>(villas));
     }
     [HttpGet("{id:int}", Name = "GetVilla")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -54,25 +58,22 @@ public class VillaAPIController : ControllerBase
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<VillaCreateDTO>> CreateVilla([FromBody] VillaCreateDTO villaDTO)
+    public async Task<ActionResult<VillaCreateDTO>> CreateVilla([FromBody] VillaCreateDTO createDTO)
     {
         if(!ModelState.IsValid)
         {
-            return BadRequest(villaDTO);
+            return BadRequest(createDTO);
         }
-        if (await _db.Villas.FirstOrDefaultAsync(x=>x.Name.ToLower() == villaDTO.Name.ToLower()) != null)
+        if (await _db.Villas.FirstOrDefaultAsync(x=>x.Name.ToLower() == createDTO.Name.ToLower()) != null)
         {
             ModelState.AddModelError("CustomError", "Villa alredy Exist!");
             return BadRequest(ModelState);
         }
-        if (villaDTO == null)
+        if (createDTO == null)
         {
-            return BadRequest(villaDTO);
+            return BadRequest(createDTO);
         }
-        Villa villa = new Villa()
-        {
-            Name = villaDTO.Name,
-        };
+        Villa villa = _mapper.Map<Villa>(createDTO);
         await _db.Villas.AddAsync(villa);
         await _db.SaveChangesAsync();
 
